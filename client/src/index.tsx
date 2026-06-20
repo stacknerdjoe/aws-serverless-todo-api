@@ -1,13 +1,24 @@
 import React from 'react'
 import ReactDOM from 'react-dom'
+import { AuthProvider } from 'react-oidc-context'
 import './index.css'
 import * as serviceWorker from './serviceWorker'
 import 'semantic-ui-css/semantic.min.css'
-import { makeAuthRouting } from './routing';
+import { makeAuthRouting } from './routing'
 
-ReactDOM.render(makeAuthRouting(), document.getElementById('root'))
+const oidcConfig = {
+  authority: process.env.REACT_APP_COGNITO_AUTHORITY!,
+  client_id: process.env.REACT_APP_COGNITO_CLIENT_ID!,
+  redirect_uri: process.env.REACT_APP_REDIRECT_URI!,
+  response_type: 'code',
+  scope: 'openid email profile',
+}
 
-// If you want your app to work offline and load faster, you can change
-// unregister() to register() below. Note this comes with some pitfalls.
-// Learn more about service workers: https://bit.ly/CRA-PWA
+ReactDOM.render(
+  <AuthProvider {...oidcConfig}>
+    {makeAuthRouting()}
+  </AuthProvider>,
+  document.getElementById('root')
+)
+
 serviceWorker.unregister()

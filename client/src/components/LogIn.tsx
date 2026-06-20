@@ -1,27 +1,17 @@
 import * as React from 'react'
-import Auth from '../auth/Auth'
 import { Button } from 'semantic-ui-react'
+import { useAuth } from 'react-oidc-context'
 
-interface LogInProps {
-  auth: Auth
-}
+export function LogIn() {
+  const auth = useAuth()
 
-interface LogInState {}
+  return (
+    <div>
+      <h1>Please log in</h1>
 
-export class LogIn extends React.PureComponent<LogInProps, LogInState> {
-  onLogin = () => {
-    this.props.auth.login()
-  }
-
-  render() {
-    return (
-      <div>
-        <h1>Please log in</h1>
-
-        <Button onClick={this.onLogin} size="huge" color="olive">
-          Log in
-        </Button>
-      </div>
-    )
-  }
+      <Button onClick={() => auth.signinRedirect()} size="huge" color="olive">
+        Log in
+      </Button>
+    </div>
+  )
 }

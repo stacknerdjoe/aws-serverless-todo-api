@@ -1,5 +1,4 @@
 import dateFormat from 'dateformat'
-import { History } from 'history'
 import update from 'immutability-helper'
 import * as React from 'react'
 import {
@@ -13,107 +12,87 @@ import {
   Image,
   Loader
 } from 'semantic-ui-react'
+import { useHistory } from 'react-router-dom'
+import { useAuth } from 'react-oidc-context'
 
 import { createTodo, deleteTodo, getTodos, patchTodo } from '../api/todos-api'
-import Auth from '../auth/Auth'
 import { Todo } from '../types/Todo'
 
-interface TodosProps {
-  auth: Auth
-  history: History
-}
+export function Todos() {
+  const auth = useAuth()
+  const history = useHistory()
+  const [todos, setTodos] = React.useState<Todo[]>([])
+  const [newTodoName, setNewTodoName] = React.useState('')
+  const [loadingTodos, setLoadingTodos] = React.useState(true)
 
-interface TodosState {
-  todos: Todo[]
-  newTodoName: string
-  loadingTodos: boolean
-}
+  React.useEffect(() => {
+    const fetchTodos = async () => {
+      try {
+        const items = await getTodos(auth.user!.access_token)
+        setTodos(items)
+        setLoadingTodos(false)
+      } catch (e) {
+        alert(`Failed to fetch todos: ${e.message}`)
+      }
+    }
+    fetchTodos()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // run once on mount; auth.user is guaranteed non-null (App guards with isAuthenticated)
 
-export class Todos extends React.PureComponent<TodosProps, TodosState> {
-  state: TodosState = {
-    todos: [],
-    newTodoName: '',
-    loadingTodos: true
+  const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setNewTodoName(event.target.value)
   }
 
-  handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    this.setState({ newTodoName: event.target.value })
+  const onEditButtonClick = (todoId: string) => {
+    history.push(`/todos/${todoId}/edit`)
   }
 
-  onEditButtonClick = (todoId: string) => {
-    this.props.history.push(`/todos/${todoId}/edit`)
-  }
-
-  onTodoCreate = async (event: React.ChangeEvent<HTMLButtonElement>) => {
+  const onTodoCreate = async (event: React.ChangeEvent<HTMLButtonElement>) => {
     try {
-      const dueDate = this.calculateDueDate()
-      const newTodo = await createTodo(this.props.auth.getIdToken(), {
-        name: this.state.newTodoName,
+      const dueDate = calculateDueDate()
+      const newTodo = await createTodo(auth.user!.access_token, {
+        name: newTodoName,
         dueDate
       })
-      this.setState({
-        todos: [...this.state.todos, newTodo],
-        newTodoName: ''
-      })
+      setTodos([...todos, newTodo])
+      setNewTodoName('')
     } catch {
       alert('Todo creation failed')
     }
   }
 
-  onTodoDelete = async (todoId: string) => {
+  const onTodoDelete = async (todoId: string) => {
     try {
-      await deleteTodo(this.props.auth.getIdToken(), todoId)
-      this.setState({
-        todos: this.state.todos.filter(todo => todo.todoId != todoId)
-      })
+      await deleteTodo(auth.user!.access_token, todoId)
+      setTodos(todos.filter(todo => todo.todoId !== todoId))
     } catch {
       alert('Todo deletion failed')
     }
   }
 
-  onTodoCheck = async (pos: number) => {
+  const onTodoCheck = async (pos: number) => {
     try {
-      const todo = this.state.todos[pos]
-      await patchTodo(this.props.auth.getIdToken(), todo.todoId, {
+      const todo = todos[pos]
+      await patchTodo(auth.user!.access_token, todo.todoId, {
         name: todo.name,
         dueDate: todo.dueDate,
         done: !todo.done
       })
-      this.setState({
-        todos: update(this.state.todos, {
-          [pos]: { done: { $set: !todo.done } }
-        })
-      })
+      setTodos(update(todos, {
+        [pos]: { done: { $set: !todo.done } }
+      }))
     } catch {
       alert('Todo update failed')
     }
   }
 
-  async componentDidMount() {
-    try {
-      const todos = await getTodos(this.props.auth.getIdToken())
-      this.setState({
-        todos,
-        loadingTodos: false
-      })
-    } catch (e) {
-      alert(`Failed to fetch todos: ${e.message}`)
-    }
+  const calculateDueDate = (): string => {
+    const date = new Date()
+    date.setDate(date.getDate() + 7)
+    return dateFormat(date, 'yyyy-mm-dd') as string
   }
 
-  render() {
-    return (
-      <div>
-        <Header as="h1">TODOs</Header>
-
-        {this.renderCreateTodoInput()}
-
-        {this.renderTodos()}
-      </div>
-    )
-  }
-
-  renderCreateTodoInput() {
+  const renderCreateTodoInput = () => {
     return (
       <Grid.Row>
         <Grid.Column width={16}>
@@ -123,12 +102,12 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
               labelPosition: 'left',
               icon: 'add',
               content: 'New task',
-              onClick: this.onTodoCreate
+              onClick: onTodoCreate
             }}
             fluid
             actionPosition="left"
             placeholder="To change the world..."
-            onChange={this.handleNameChange}
+            onChange={handleNameChange}
           />
         </Grid.Column>
         <Grid.Column width={16}>
@@ -138,15 +117,7 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
     )
   }
 
-  renderTodos() {
-    if (this.state.loadingTodos) {
-      return this.renderLoading()
-    }
-
-    return this.renderTodosList()
-  }
-
-  renderLoading() {
+  const renderLoading = () => {
     return (
       <Grid.Row>
         <Loader indeterminate active inline="centered">
@@ -156,15 +127,15 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
     )
   }
 
-  renderTodosList() {
+  const renderTodosList = () => {
     return (
       <Grid padded>
-        {this.state.todos.map((todo, pos) => {
+        {todos.map((todo, pos) => {
           return (
             <Grid.Row key={todo.todoId}>
               <Grid.Column width={1} verticalAlign="middle">
                 <Checkbox
-                  onChange={() => this.onTodoCheck(pos)}
+                  onChange={() => onTodoCheck(pos)}
                   checked={todo.done}
                 />
               </Grid.Column>
@@ -178,7 +149,7 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
                 <Button
                   icon
                   color="blue"
-                  onClick={() => this.onEditButtonClick(todo.todoId)}
+                  onClick={() => onEditButtonClick(todo.todoId)}
                 >
                   <Icon name="pencil" />
                 </Button>
@@ -187,7 +158,7 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
                 <Button
                   icon
                   color="red"
-                  onClick={() => this.onTodoDelete(todo.todoId)}
+                  onClick={() => onTodoDelete(todo.todoId)}
                 >
                   <Icon name="delete" />
                 </Button>
@@ -205,10 +176,13 @@ export class Todos extends React.PureComponent<TodosProps, TodosState> {
     )
   }
 
-  calculateDueDate(): string {
-    const date = new Date()
-    date.setDate(date.getDate() + 7)
+  return (
+    <div>
+      <Header as="h1">TODOs</Header>
 
-    return dateFormat(date, 'yyyy-mm-dd') as string
-  }
+      {renderCreateTodoInput()}
+
+      {loadingTodos ? renderLoading() : renderTodosList()}
+    </div>
+  )
 }
