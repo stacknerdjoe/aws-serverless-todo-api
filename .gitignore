@@ -1,0 +1,9 @@
+node_modules/
+coverage/
+.env
+.env.*
+.serverless/
+.build/
+*.log
+.DS_Store
+.claude/settings.local.json
